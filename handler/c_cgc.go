@@ -22,6 +22,8 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 		return responseValidationError(c, msg)
 	}
 
+	fmt.Println("Start")
+
 	lists, err := CGCScrapList(i.Url)
 	if err != nil {
 		fmt.Println(err)
