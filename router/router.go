@@ -52,7 +52,6 @@ func SetupRoutes(h *handler.Handler, db *gorm.DB) *echo.Echo {
 
 	cgc := provider.Group("/cgc")
 	cgc.POST("", h.InsertCGC)
-	cgc.POST("/check", h.CheckCGC)
 
 	priceCharting := provider.Group("/pricecharting")
 	priceCharting.POST("", h.PriceChartCards)
