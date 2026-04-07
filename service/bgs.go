@@ -25,6 +25,10 @@ func (s *BGSService) GetByCardNameAndCardNumberAndSetId(cardName, cardNumber, se
 	return s.bgsRepo.GetByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId)
 }
 
+func (s *BGSService) GetDetailByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) (*model.BGS, error) {
+	return s.bgsRepo.GetDetailByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId)
+}
+
 func (s *BGSService) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.BGS, error) {
 	return s.bgsRepo.GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName)
 }

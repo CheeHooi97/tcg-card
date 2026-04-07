@@ -77,6 +77,28 @@ func (h *Handler) InsertPSA(c echo.Context) error {
 							return responseError(c, errcode.InternalServerError)
 						}
 
+						logging := model.NewPSALogging()
+						logging.PSAId = psa.Id
+						logging.CardNumber = card.CardNumber
+						logging.CardName = card.CardName
+						logging.Description = card.Description
+						logging.SetName = newSet.Name
+						logging.Total = card.Total
+						logging.Grade1 = card.Grade1
+						logging.Grade2 = card.Grade2
+						logging.Grade3 = card.Grade3
+						logging.Grade4 = card.Grade4
+						logging.Grade5 = card.Grade5
+						logging.Grade6 = card.Grade6
+						logging.Grade7 = card.Grade7
+						logging.Grade8 = card.Grade8
+						logging.Grade9 = card.Grade9
+						logging.Grade10 = card.Grade10
+
+						if err := h.PSALogging.Create(logging); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
+
 						urlCheck := h.PSAUrl.GetByPath(newSet.Link)
 
 						if !urlCheck {
@@ -88,18 +110,55 @@ func (h *Handler) InsertPSA(c echo.Context) error {
 								return responseError(c, errcode.InternalServerError)
 							}
 						}
-					}
-					// else {
-					// 	card, err := h.PSA.GetDetailByCardNameAndCardNumberAndDescription(card.CardName, card.CardNumber, card.Description)
-					// 	if err != nil {
-					// 		return responseError(c, errcode.InternalServerError)
-					// 	}
+					} else {
+						dbPSA, err := h.PSA.GetDetailByCardNameAndCardNumberAndDescription(card.CardName, card.CardNumber, card.Description)
+						if err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
 
-					// 	card.SetName = newSet.Name
-					// 	if err := h.PSA.Update(card); err != nil {
-					// 		return responseError(c, errcode.InternalServerError)
-					// 	}
-					// }
+						logging := model.NewPSALogging()
+						if dbPSA != nil && dbPSA.Id != "" {
+							logging.PSAId = dbPSA.Id
+						}
+
+						logging.CardNumber = card.CardNumber
+						logging.CardName = card.CardName
+						logging.Description = card.Description
+						logging.SetName = newSet.Name
+						logging.Total = card.Total
+						logging.Grade1 = card.Grade1
+						logging.Grade2 = card.Grade2
+						logging.Grade3 = card.Grade3
+						logging.Grade4 = card.Grade4
+						logging.Grade5 = card.Grade5
+						logging.Grade6 = card.Grade6
+						logging.Grade7 = card.Grade7
+						logging.Grade8 = card.Grade8
+						logging.Grade9 = card.Grade9
+						logging.Grade10 = card.Grade10
+
+						if dbPSA != nil && dbPSA.Id != "" {
+							if dbPSA.SetName != "" {
+								logging.SetName = dbPSA.SetName
+							}
+							if dbPSA.SetNumber != "" {
+								logging.SetNumber = dbPSA.SetNumber
+							}
+							if dbPSA.Rarity != "" {
+								logging.Rarity = dbPSA.Rarity
+							}
+							if dbPSA.SpecID != "" {
+								logging.SpecID = dbPSA.SpecID
+							}
+							if dbPSA.Auth != "" {
+								logging.Auth = dbPSA.Auth
+							}
+						}
+
+						if err := h.PSALogging.Create(logging); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
+					}
 				}
 			} else {
 				continue

@@ -126,12 +126,78 @@ func (h *Handler) CheckCGC(c echo.Context) error {
 						}
 					}
 
-					if err := h.CGC.Create(cgc); err != nil {
-						return responseError(c, errcode.InternalServerError)
-					}
+						if err := h.CGC.Create(cgc); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
 
-					continue
-				}
+						logging := model.NewCGCLogging()
+						logging.CGCId = cgc.Id
+						logging.CardName = cgc.CardName
+						logging.CardNumber = cgc.CardNumber
+						logging.SetNumber = cgc.SetNumber
+						logging.SetName = cgc.SetName
+						logging.Rarity = cgc.Rarity
+						logging.Total = cgc.Total
+
+						for _, grade := range card.Grades {
+							switch grade.Grade {
+							case "1":
+								logging.Grade1 = grade.Count
+							case "1.5":
+								logging.Grade1_5 = grade.Count
+							case "2":
+								logging.Grade2 = grade.Count
+							case "2.5":
+								logging.Grade2_5 = grade.Count
+							case "3":
+								logging.Grade3 = grade.Count
+							case "3.5":
+								logging.Grade3_5 = grade.Count
+							case "4":
+								logging.Grade4 = grade.Count
+							case "4.5":
+								logging.Grade4_5 = grade.Count
+							case "5":
+								logging.Grade5 = grade.Count
+							case "5.5":
+								logging.Grade5_5 = grade.Count
+							case "6":
+								logging.Grade6 = grade.Count
+							case "6.5":
+								logging.Grade6_5 = grade.Count
+							case "7":
+								logging.Grade7 = grade.Count
+							case "7.5":
+								logging.Grade7_5 = grade.Count
+							case "8":
+								logging.Grade8 = grade.Count
+							case "8.5":
+								logging.Grade8_5 = grade.Count
+							case "9":
+								logging.Grade9 = grade.Count
+							case "Mint+ 9.5":
+								logging.Grade9_5 = grade.Count
+							case "Gem Mint 10":
+								logging.Grade10 = grade.Count
+							case "Pristine 10":
+								logging.Grade10P = grade.Count
+							case "AU":
+								continue
+							case "AA":
+								continue
+							case "Perfect 10":
+								continue
+							default:
+								continue
+							}
+						}
+
+						if err := h.CGCLogging.Create(logging); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
+
+						continue
+					}
 
 				dbCGC, err := h.CGC.GetByCardNameAndCardNumberAndSetNameAndRarity(cgc.CardName, cgc.CardNumber, cgc.SetName, cgc.Rarity)
 				if err != nil {

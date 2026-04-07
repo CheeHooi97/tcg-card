@@ -11,6 +11,7 @@ type BGSRepository interface {
 	Create(auth *model.BGS) error
 	GetById(id string) (*model.BGS, error)
 	GetByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) bool
+	GetDetailByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) (*model.BGS, error)
 	GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.BGS, error)
 	GetByCardNumberAndSetNumber(cardNumber, setNumber string) (*model.BGS, error)
 	GetAllCards() ([]*model.BGS, error)
@@ -56,6 +57,19 @@ func (r *bgsRepository) GetByCardNameAndCardNumberAndSetId(cardName, cardNumber,
 		}
 	}
 	return true
+}
+
+func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) (*model.BGS, error) {
+	var bgs model.BGS
+	result := r.db.
+		Where("cardName = ? AND cardNumber = ? AND setId = ?", cardName, cardNumber, setId).
+		First(&bgs)
+	if result.Error != nil {
+		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, result.Error
+		}
+	}
+	return &bgs, nil
 }
 
 func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.BGS, error) {

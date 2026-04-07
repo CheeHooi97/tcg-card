@@ -104,11 +104,46 @@ func (h *Handler) InsertBGS(c echo.Context) error {
 
 					bgs.SetName = bgsCard.SetTitle
 
-					if err := h.BGS.Create(bgs); err != nil {
-						return responseError(c, errcode.InternalServerError)
-					}
+						if err := h.BGS.Create(bgs); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
 
-					// urlCheck := h.BGSUrl.GetByPath(link.URL)
+						logging := model.NewBGSLogging()
+						logging.BGSId = bgs.Id
+						logging.CardName = bgs.CardName
+						logging.CardNumber = bgs.CardNumber
+						logging.SetId = bgs.SetId
+						logging.SetName = bgs.SetName
+						logging.Rarity = bgs.Rarity
+						logging.Description = bgs.Description
+						logging.SetNumber = bgs.SetNumber
+						logging.Total = bgs.Total
+						logging.Grade1 = bgs.Grade1
+						logging.Grade1_5 = bgs.Grade1_5
+						logging.Grade2 = bgs.Grade2
+						logging.Grade2_5 = bgs.Grade2_5
+						logging.Grade3 = bgs.Grade3
+						logging.Grade3_5 = bgs.Grade3_5
+						logging.Grade4 = bgs.Grade4
+						logging.Grade4_5 = bgs.Grade4_5
+						logging.Grade5 = bgs.Grade5
+						logging.Grade5_5 = bgs.Grade5_5
+						logging.Grade6 = bgs.Grade6
+						logging.Grade6_5 = bgs.Grade6_5
+						logging.Grade7 = bgs.Grade7
+						logging.Grade7_5 = bgs.Grade7_5
+						logging.Grade8 = bgs.Grade8
+						logging.Grade8_5 = bgs.Grade8_5
+						logging.Grade9 = bgs.Grade9
+						logging.Grade9_5 = bgs.Grade9_5
+						logging.Grade10P = bgs.Grade10P
+						logging.Grade10BL = bgs.Grade10BL
+
+						if err := h.BGSLogging.Create(logging); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
+
+						// urlCheck := h.BGSUrl.GetByPath(link.URL)
 
 					// if !urlCheck {
 					// 	bgsUrl := model.NewBGSUrl()
@@ -118,6 +153,61 @@ func (h *Handler) InsertBGS(c echo.Context) error {
 					// 		return responseError(c, errcode.InternalServerError)
 					// 	}
 					// }
+				} else {
+					dbBGS, err := h.BGS.GetDetailByCardNameAndCardNumberAndSetId(bgsCard.CardName, bgsCard.CardNumber, bgsCard.SetID)
+					if err != nil {
+						return responseError(c, errcode.InternalServerError)
+					}
+
+					logging := model.NewBGSLogging()
+					if dbBGS != nil && dbBGS.Id != "" {
+						logging.BGSId = dbBGS.Id
+					}
+
+					logging.CardName = bgsCard.CardName
+					logging.CardNumber = bgsCard.CardNumber
+					logging.SetId = bgsCard.SetID
+					logging.SetName = bgsCard.SetTitle
+					logging.Total = bgsCard.TotalCount
+					logging.Grade1 = bgsCard.GradeCounts["1"]
+					logging.Grade1_5 = bgsCard.GradeCounts["1.5"]
+					logging.Grade2 = bgsCard.GradeCounts["2"]
+					logging.Grade2_5 = bgsCard.GradeCounts["2.5"]
+					logging.Grade3 = bgsCard.GradeCounts["3"]
+					logging.Grade3_5 = bgsCard.GradeCounts["3.5"]
+					logging.Grade4 = bgsCard.GradeCounts["4"]
+					logging.Grade4_5 = bgsCard.GradeCounts["4.5"]
+					logging.Grade5 = bgsCard.GradeCounts["5"]
+					logging.Grade5_5 = bgsCard.GradeCounts["5.5"]
+					logging.Grade6 = bgsCard.GradeCounts["6"]
+					logging.Grade6_5 = bgsCard.GradeCounts["6.5"]
+					logging.Grade7 = bgsCard.GradeCounts["7"]
+					logging.Grade7_5 = bgsCard.GradeCounts["7.5"]
+					logging.Grade8 = bgsCard.GradeCounts["8"]
+					logging.Grade8_5 = bgsCard.GradeCounts["8.5"]
+					logging.Grade9 = bgsCard.GradeCounts["9"]
+					logging.Grade9_5 = bgsCard.GradeCounts["9.5"]
+					logging.Grade10P = bgsCard.GradeCounts["10P"]
+					logging.Grade10BL = bgsCard.GradeCounts["10BL"]
+
+					if dbBGS != nil && dbBGS.Id != "" {
+						if dbBGS.SetName != "" {
+							logging.SetName = dbBGS.SetName
+						}
+						if dbBGS.SetNumber != "" {
+							logging.SetNumber = dbBGS.SetNumber
+						}
+						if dbBGS.Rarity != "" {
+							logging.Rarity = dbBGS.Rarity
+						}
+						if dbBGS.Description != "" {
+							logging.Description = dbBGS.Description
+						}
+					}
+
+					if err := h.BGSLogging.Create(logging); err != nil {
+						return responseError(c, errcode.InternalServerError)
+					}
 				}
 			}
 			time.Sleep(5 * time.Second)

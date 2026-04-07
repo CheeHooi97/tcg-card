@@ -77,6 +77,7 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 					tag := model.NewTAG()
 					tag.CardSet = setUrl.Name
 					tag.Total = card.Total
+					tag.GradeVA = card.GradeVA
 					tag.Grade1 = card.Grade1
 					tag.Grade1_5 = card.Grade1_5
 					tag.Grade2 = card.Grade2
@@ -110,11 +111,48 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 						tag.SetNumber = ""
 					}
 
-					if err := h.TAG.Create(tag); err != nil {
-						return responseError(c, errcode.InternalServerError)
-					}
+						if err := h.TAG.Create(tag); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
 
-					urlCheck := h.TAGUrl.GetByPath(setUrl.Link)
+						logging := model.NewTAGLogging()
+						logging.TagId = tag.Id
+						logging.CardName = name
+						logging.CardNumber = card.CardNumber
+						logging.SetName = result
+						logging.CardSet = setUrl.Name
+						logging.Rarity = rarity
+						logging.Total = card.Total
+						logging.GradeVA = card.GradeVA
+						logging.Grade1 = card.Grade1
+						logging.Grade1_5 = card.Grade1_5
+						logging.Grade2 = card.Grade2
+						logging.Grade2_5 = card.Grade2_5
+						logging.Grade3 = card.Grade3
+						logging.Grade3_5 = card.Grade3_5
+						logging.Grade4 = card.Grade4
+						logging.Grade4_5 = card.Grade4_5
+						logging.Grade5 = card.Grade5
+						logging.Grade5_5 = card.Grade5_5
+						logging.Grade6 = card.Grade6
+						logging.Grade6_5 = card.Grade6_5
+						logging.Grade7 = card.Grade7
+						logging.Grade7_5 = card.Grade7_5
+						logging.Grade8 = card.Grade8
+						logging.Grade8_5 = card.Grade8_5
+						logging.Grade9 = card.Grade9
+						logging.Grade10 = card.Grade10
+						logging.Grade10P = card.Grade10P
+
+						if len(parts) == 2 {
+							logging.SetNumber = strings.TrimSpace(parts[1])
+						}
+
+						if err := h.TAGLogging.Create(logging); err != nil {
+							return responseError(c, errcode.InternalServerError)
+						}
+
+						urlCheck := h.TAGUrl.GetByPath(setUrl.Link)
 
 					if !urlCheck {
 						tagUrl := model.NewTAGUrl()
@@ -123,6 +161,66 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 						if err := h.TAGUrl.Create(tagUrl); err != nil {
 							return responseError(c, errcode.InternalServerError)
 						}
+					}
+				} else {
+					dbTag, err := h.TAG.GetDetailByCardNameAndCardNumberAndSetName(name, card.CardNumber, setUrl.Name)
+					if err != nil {
+						return responseError(c, errcode.InternalServerError)
+					}
+
+					logging := model.NewTAGLogging()
+					if dbTag != nil && dbTag.Id != "" {
+						logging.TagId = dbTag.Id
+					}
+
+					logging.CardName = name
+					logging.CardNumber = card.CardNumber
+					logging.SetName = result
+					logging.CardSet = setUrl.Name
+					logging.Rarity = rarity
+					logging.Total = card.Total
+					logging.GradeVA = card.GradeVA
+					logging.Grade1 = card.Grade1
+					logging.Grade1_5 = card.Grade1_5
+					logging.Grade2 = card.Grade2
+					logging.Grade2_5 = card.Grade2_5
+					logging.Grade3 = card.Grade3
+					logging.Grade3_5 = card.Grade3_5
+					logging.Grade4 = card.Grade4
+					logging.Grade4_5 = card.Grade4_5
+					logging.Grade5 = card.Grade5
+					logging.Grade5_5 = card.Grade5_5
+					logging.Grade6 = card.Grade6
+					logging.Grade6_5 = card.Grade6_5
+					logging.Grade7 = card.Grade7
+					logging.Grade7_5 = card.Grade7_5
+					logging.Grade8 = card.Grade8
+					logging.Grade8_5 = card.Grade8_5
+					logging.Grade9 = card.Grade9
+					logging.Grade10 = card.Grade10
+					logging.Grade10P = card.Grade10P
+
+					if len(parts) == 2 {
+						logging.SetNumber = strings.TrimSpace(parts[1])
+					}
+
+					if dbTag != nil && dbTag.Id != "" {
+						if dbTag.SetName != "" {
+							logging.SetName = dbTag.SetName
+						}
+						if dbTag.CardSet != "" {
+							logging.CardSet = dbTag.CardSet
+						}
+						if dbTag.Rarity != "" {
+							logging.Rarity = dbTag.Rarity
+						}
+						if dbTag.SetNumber != "" {
+							logging.SetNumber = dbTag.SetNumber
+						}
+					}
+
+					if err := h.TAGLogging.Create(logging); err != nil {
+						return responseError(c, errcode.InternalServerError)
 					}
 				}
 
