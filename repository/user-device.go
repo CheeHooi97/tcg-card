@@ -52,8 +52,8 @@ func (r *userDeviceRepository) GetById(id string) (*model.UserDevice, error) {
 func (r *userDeviceRepository) GetAllByUserId(userId string) ([]*model.UserDevice, error) {
 	var devices []*model.UserDevice
 	result := r.db.
-		Where("userId = ?", userId).
-		Order("updatedDateTime DESC").
+		Where("user_id = ?", userId).
+		Order("updated_date_time DESC").
 		Find(&devices)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -66,8 +66,8 @@ func (r *userDeviceRepository) GetAllByUserId(userId string) ([]*model.UserDevic
 func (r *userDeviceRepository) FindLastByUserId(userId string) (*model.UserDevice, error) {
 	var device model.UserDevice
 	result := r.db.
-		Where("userId = ?", userId).
-		Order("updatedDateTime DESC").
+		Where("user_id = ?", userId).
+		Order("updated_date_time DESC").
 		First(&device)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -80,8 +80,8 @@ func (r *userDeviceRepository) FindLastByUserId(userId string) (*model.UserDevic
 func (r *userDeviceRepository) FindByDeviceId(deviceId string) (*model.UserDevice, error) {
 	var device model.UserDevice
 	result := r.db.
-		Where("deviceId = ?", deviceId).
-		Order("createdDateTime DESC").
+		Where("device_id = ?", deviceId).
+		Order("created_date_time DESC").
 		First(&device)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -94,8 +94,8 @@ func (r *userDeviceRepository) FindByDeviceId(deviceId string) (*model.UserDevic
 func (r *userDeviceRepository) FindByUserIdAndDeviceID(userId, deviceId string) (*model.UserDevice, error) {
 	var device model.UserDevice
 	result := r.db.
-		Where("userId = ? AND deviceId != ?", userId, deviceId).
-		Order("createdDateTime DESC").
+		Where("user_id = ? AND device_id != ?", userId, deviceId).
+		Order("created_date_time DESC").
 		First(&device)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -108,8 +108,8 @@ func (r *userDeviceRepository) FindByUserIdAndDeviceID(userId, deviceId string) 
 func (r *userDeviceRepository) UpdateByPnsToken(token string) error {
 	result := r.db.
 		Model(&model.UserDevice{}).
-		Where("pnsToken = ?", token).
-		Update("pnsToken", "")
+		Where("pns_token = ?", token).
+		Update("pns_token", "")
 
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -142,7 +142,8 @@ func (r *userDeviceRepository) Update(device *model.UserDevice) error {
 func (r *userDeviceRepository) Delete(id string) error {
 	result := r.db.Model(&model.UserDevice{}).Where("id = ?", id).Updates(map[string]any{
 		"status":          false,
-		"updatedDateTime": time.Now().UTC(),
+		"updated_date_time": time.Now().UTC(),
 	})
 	return result.Error
 }
+

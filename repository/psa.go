@@ -85,7 +85,7 @@ func (r *psaRepository) GetSpecIDs() ([]*model.PSA, error) {
 	startOfToday := time.Now().UTC().Truncate(24 * time.Hour)
 
 	result := r.db.
-		Where("updatedDateTime < ?", startOfToday).
+		Where("updated_date_time < ?", startOfToday).
 		Find(&auth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -99,7 +99,7 @@ func (r *psaRepository) GetSpecIDs() ([]*model.PSA, error) {
 func (r *psaRepository) GetByCardNameAndCardNumberAndDescriptionAndSet(cardName, cardNumber, description, setName string) bool {
 	var auth model.PSA
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND description = ? AND setName = ?", cardName, cardNumber, description, setName).
+		Where("card_name = ? AND card_number = ? AND description = ? AND set_name = ?", cardName, cardNumber, description, setName).
 		First(&auth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -112,7 +112,7 @@ func (r *psaRepository) GetByCardNameAndCardNumberAndDescriptionAndSet(cardName,
 func (r *psaRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.PSA, error) {
 	var psa model.PSA
 	result := r.db.
-		Where("cardName LIKE ? AND cardNumber LIKE ? AND setName LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
+		Where("card_name LIKE ? AND card_number LIKE ? AND set_name LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
 		First(&psa)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -125,7 +125,7 @@ func (r *psaRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, car
 func (r *psaRepository) GetDetailByCardNameAndCardNumberAndDescription(cardName, cardNumber, description string) (*model.PSA, error) {
 	var auth model.PSA
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND description = ?", cardName, cardNumber, description).
+		Where("card_name = ? AND card_number = ? AND description = ?", cardName, cardNumber, description).
 		First(&auth)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -138,7 +138,7 @@ func (r *psaRepository) GetDetailByCardNameAndCardNumberAndDescription(cardName,
 func (r *psaRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string) (*model.PSA, error) {
 	var auth model.PSA
 	result := r.db.
-		Where("cardNumber = ? AND setNumber = ?", cardNumber, setNumber).
+		Where("card_number = ? AND set_number = ?", cardNumber, setNumber).
 		First(&auth)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -160,3 +160,4 @@ func (r *psaRepository) Delete(id string) error {
 	result := r.db.Model(&model.PSA{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+

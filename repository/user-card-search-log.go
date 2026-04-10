@@ -45,7 +45,7 @@ func (r *userCardSearchLogRepository) GetById(id string) (*model.UserCardSearchL
 func (r *userCardSearchLogRepository) GetAllCards() ([]*model.UserCardSearchLog, error) {
 	var UserCardSearchLog []*model.UserCardSearchLog
 	result := r.db.
-		Order("createdDateTime ASC").
+		Order("created_date_time ASC").
 		Find(&UserCardSearchLog)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -67,3 +67,4 @@ func (r *userCardSearchLogRepository) Delete(id string) error {
 	result := r.db.Model(&model.UserCardSearchLog{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+

@@ -33,11 +33,11 @@ func LoadConfig() {
 	_ = godotenv.Load()
 
 	Env = GetEnv("ENV")
-	DBHost = GetEnv("MYSQL_HOST")
-	DBPort = GetEnv("MYSQL_PORT")
-	DBUser = GetEnv("MYSQL_USER")
-	DBPassword = GetEnv("MYSQL_PASSWORD")
-	DBName = GetEnv("MYSQL_DATABASE")
+	DBHost = GetEnv("POSTGRES_HOST")
+	DBPort = GetEnv("POSTGRES_PORT")
+	DBUser = GetEnv("POSTGRES_USER")
+	DBPassword = GetEnv("POSTGRES_PASSWORD")
+	DBName = GetEnv("POSTGRES_DATABASE")
 	SystemAesKey = GetEnv("SYSTEM_AES_KEY")
 	PokemonApiKey = GetEnv("POKEMON_API_KEY") // Optional, so use os.Getenv directly
 	OSSEndpoint = GetEnv("OSS_ENDPOINT")

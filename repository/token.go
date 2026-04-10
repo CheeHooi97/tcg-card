@@ -8,10 +8,10 @@ import (
 )
 
 type TokenRepository interface {
-	Create(Token *model.Token) error
+	Create(token *model.Token) error
 	GetById(id string) (*model.Token, error)
 	FindByReferenceIdAndDeviceId(referenceId, deviceId string) (*model.Token, error)
-	Update(Token *model.Token) error
+	Update(token *model.Token) error
 	Delete(id string) error
 }
 
@@ -23,8 +23,8 @@ func NewTokenRepository(db *gorm.DB) TokenRepository {
 	return &tokenRepository{db: db}
 }
 
-func (r *tokenRepository) Create(Token *model.Token) error {
-	result := r.db.Create(Token)
+func (r *tokenRepository) Create(token *model.Token) error {
+	result := r.db.Create(token)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -32,20 +32,20 @@ func (r *tokenRepository) Create(Token *model.Token) error {
 }
 
 func (r *tokenRepository) GetById(id string) (*model.Token, error) {
-	var Token model.Token
-	result := r.db.First(&Token, id)
+	var token model.Token
+	result := r.db.First(&token, id)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, result.Error
 		}
 	}
-	return &Token, nil
+	return &token, nil
 }
 
 func (r *tokenRepository) FindByReferenceIdAndDeviceId(referenceId, deviceId string) (*model.Token, error) {
 	var token model.Token
 	result := r.db.
-		Where("referenceId = ? AND deviceId = ?", referenceId, deviceId).
+		Where("reference_id = ? AND device_id = ?", referenceId, deviceId).
 		First(&token)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -55,8 +55,8 @@ func (r *tokenRepository) FindByReferenceIdAndDeviceId(referenceId, deviceId str
 	return &token, nil
 }
 
-func (r *tokenRepository) Update(Token *model.Token) error {
-	result := r.db.Save(Token)
+func (r *tokenRepository) Update(token *model.Token) error {
+	result := r.db.Save(token)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -67,3 +67,4 @@ func (r *tokenRepository) Delete(id string) error {
 	result := r.db.Model(&model.Token{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+

@@ -49,7 +49,7 @@ func (r *bgsRepository) GetById(id string) (*model.BGS, error) {
 func (r *bgsRepository) GetByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) bool {
 	var auth model.BGS
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND setId = ?", cardName, cardNumber, setId).
+		Where("card_name = ? AND card_number = ? AND set_id = ?", cardName, cardNumber, setId).
 		First(&auth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -62,7 +62,7 @@ func (r *bgsRepository) GetByCardNameAndCardNumberAndSetId(cardName, cardNumber,
 func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetId(cardName, cardNumber, setId string) (*model.BGS, error) {
 	var bgs model.BGS
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND setId = ?", cardName, cardNumber, setId).
+		Where("card_name = ? AND card_number = ? AND set_id = ?", cardName, cardNumber, setId).
 		First(&bgs)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -75,7 +75,7 @@ func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetId(cardName, cardN
 func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.BGS, error) {
 	var bgs model.BGS
 	result := r.db.
-		Where("cardName LIKE ? AND cardNumber LIKE ? AND description LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
+		Where("card_name LIKE ? AND card_number LIKE ? AND description LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
 		First(&bgs)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -88,7 +88,7 @@ func (r *bgsRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, car
 func (r *bgsRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string) (*model.BGS, error) {
 	var bgs model.BGS
 	result := r.db.
-		Where("cardNumber = ? AND setNumber = ?", cardNumber, setNumber).
+		Where("card_number = ? AND set_number = ?", cardNumber, setNumber).
 		First(&bgs)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -101,7 +101,7 @@ func (r *bgsRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string
 func (r *bgsRepository) GetAllCards() ([]*model.BGS, error) {
 	var bgs []*model.BGS
 	result := r.db.
-		Order("createdDateTime ASC").
+		Order("created_date_time ASC").
 		Find(&bgs)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -123,3 +123,4 @@ func (r *bgsRepository) Delete(id string) error {
 	result := r.db.Model(&model.BGS{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+

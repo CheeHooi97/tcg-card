@@ -9,7 +9,7 @@ type Token struct {
 	Id          string `gorm:"primaryKey" json:"id"`
 	ReferenceId string `json:"referenceId"`
 	DeviceId    string `json:"deviceId"`
-	AccessToken string `json:"accessToken" gorm:"type:LONGTEXT"`
+	AccessToken string `json:"accessToken" gorm:"type:text"`
 	BaseModel
 }
 

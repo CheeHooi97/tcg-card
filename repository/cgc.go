@@ -49,7 +49,7 @@ func (r *cgcRepository) GetById(id string) (*model.CGC, error) {
 func (r *cgcRepository) CheckCardNameAndCardNumberAndSetNameAndRarity(cardName, cardNumber, setName, rarity string) bool {
 	var auth model.CGC
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND setName = ? AND rarity = ?", cardName, cardNumber, setName, rarity).
+		Where("card_name = ? AND card_number = ? AND set_name = ? AND rarity = ?", cardName, cardNumber, setName, rarity).
 		First(&auth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -62,7 +62,7 @@ func (r *cgcRepository) CheckCardNameAndCardNumberAndSetNameAndRarity(cardName, 
 func (r *cgcRepository) GetByCardNameAndCardNumberAndSetNameAndRarity(cardName, cardNumber, setName, rarity string) (*model.CGC, error) {
 	var cgc model.CGC
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND setName = ? AND rarity = ?", cardName, cardNumber, setName, rarity).
+		Where("card_name = ? AND card_number = ? AND set_name = ? AND rarity = ?", cardName, cardNumber, setName, rarity).
 		First(&cgc)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -75,7 +75,7 @@ func (r *cgcRepository) GetByCardNameAndCardNumberAndSetNameAndRarity(cardName, 
 func (r *cgcRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.CGC, error) {
 	var cgc model.CGC
 	result := r.db.
-		Where("cardName LIKE ? AND cardNumber LIKE ? AND setName LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
+		Where("card_name LIKE ? AND card_number LIKE ? AND set_name LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
 		First(&cgc)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -88,7 +88,7 @@ func (r *cgcRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, car
 func (r *cgcRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string) (*model.CGC, error) {
 	var cgc model.CGC
 	result := r.db.
-		Where("cardNumber = ? AND setNumber = ?", cardNumber, setNumber).
+		Where("card_number = ? AND set_number = ?", cardNumber, setNumber).
 		First(&cgc)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -101,7 +101,7 @@ func (r *cgcRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string
 func (r *cgcRepository) GetAllCards() ([]*model.CGC, error) {
 	var cgc []*model.CGC
 	result := r.db.
-		Order("createdDateTime ASC").
+		Order("created_date_time ASC").
 		Find(&cgc)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -123,3 +123,4 @@ func (r *cgcRepository) Delete(id string) error {
 	result := r.db.Model(&model.CGC{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+

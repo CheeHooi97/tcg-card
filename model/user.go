@@ -10,7 +10,7 @@ type User struct {
 	CompanyId string `json:"companyId"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
-	PhotoURL  string `json:"photoUrl" sqlike:",longtext"`
+	PhotoURL  string `json:"photoUrl" gorm:"type:text"`
 	FcmToken  string `json:"fcmToken"`
 	Status    bool   `json:"status"`
 	BaseModel

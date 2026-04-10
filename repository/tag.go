@@ -49,7 +49,7 @@ func (r *tagRepository) GetById(id string) (*model.TAG, error) {
 func (r *tagRepository) GetByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) bool {
 	var auth model.TAG
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND setName = ?", cardName, cardNumber, setName).
+		Where("card_name = ? AND card_number = ? AND set_name = ?", cardName, cardNumber, setName).
 		First(&auth)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -62,7 +62,7 @@ func (r *tagRepository) GetByCardNameAndCardNumberAndSetName(cardName, cardNumbe
 func (r *tagRepository) GetDetailByCardNameAndCardNumberAndSetAndDescription(cardName, cardNumber, set, description string) (*model.TAG, error) {
 	var auth model.TAG
 	result := r.db.
-		Where("cardName = ? AND cardNumber = ? AND cardSet = ? AND description = ?", cardName, cardNumber, set, description).
+		Where("card_name = ? AND card_number = ? AND card_set = ? AND description = ?", cardName, cardNumber, set, description).
 		First(&auth)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -75,7 +75,7 @@ func (r *tagRepository) GetDetailByCardNameAndCardNumberAndSetAndDescription(car
 func (r *tagRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, cardNumber, setName string) (*model.TAG, error) {
 	var tag model.TAG
 	result := r.db.
-		Where("cardName LIKE ? AND cardNumber LIKE ? AND cardSet LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
+		Where("card_name LIKE ? AND card_number LIKE ? AND card_set LIKE ?", "%"+cardName+"%", "%"+cardNumber+"%", "%"+setName+"%").
 		First(&tag)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -88,7 +88,7 @@ func (r *tagRepository) GetDetailByCardNameAndCardNumberAndSetName(cardName, car
 func (r *tagRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string) (*model.TAG, error) {
 	var tag model.TAG
 	result := r.db.
-		Where("cardNumber = ? AND setNumber = ?", cardNumber, setNumber).
+		Where("card_number = ? AND set_number = ?", cardNumber, setNumber).
 		First(&tag)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -101,7 +101,7 @@ func (r *tagRepository) GetByCardNumberAndSetNumber(cardNumber, setNumber string
 func (r *tagRepository) GetAllCards() ([]*model.TAG, error) {
 	var tag []*model.TAG
 	result := r.db.
-		Order("createdDateTime ASC").
+		Order("created_date_time ASC").
 		Find(&tag)
 	if result.Error != nil {
 		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -123,3 +123,4 @@ func (r *tagRepository) Delete(id string) error {
 	result := r.db.Model(&model.TAG{}).Where("id = ?", id).Update("status", false)
 	return result.Error
 }
+
