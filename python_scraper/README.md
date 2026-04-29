@@ -25,3 +25,13 @@ uvicorn app:app --host 0.0.0.0 --port 8010
 - `POST /scrape/tag` body: `{"urls":["https://my.taggrading.com/pop-report/..."]}`
 
 All scrape endpoints retry failed items and continue until all inputs are processed.
+
+## Structure
+
+- `app.py` route wiring
+- `schemas.py` request schemas
+- `common.py` shared retry/browser/db config
+- `psa_scraper.py` PSA scrape module
+- `bgs_scraper.py` BGS scrape module
+- `cgc_scraper.py` CGC scrape module
+- `tag_scraper.py` TAG scrape module
