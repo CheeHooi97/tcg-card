@@ -3,9 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
-	"log"
 	"pkm/config/rarity"
-	"pkm/errcode"
 	"pkm/model"
 	"pkm/utils"
 	"strings"
@@ -25,18 +23,39 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 	}
 
 	for _, yearPath := range i.Urls {
-		setUrlLists, _ := TAGScrapSet(yearPath)
+		var setUrlLists []TAGYearSet
+		err := retryWithBackoff(fmt.Sprintf("tag scrape year %s", yearPath), 3, 3*time.Second, func() error {
+			var scrapeErr error
+			setUrlLists, scrapeErr = TAGScrapSet(yearPath)
+			return scrapeErr
+		})
+		if err != nil {
+			fmt.Println("TAGScrapSet error:", err)
+			continue
+		}
 
 		time.Sleep(3 * time.Second)
 
 		for y, setUrl := range setUrlLists {
-			// if y < 107 {
+			// if y < 42 {
 			// 	continue
 			// }
 
-			cardLists, err := TAGScrapCards(setUrl.Link)
+			var cardLists TAGPopResponse
+			err := retryWithBackoff(fmt.Sprintf("tag scrape cards set %s", setUrl.Name), 3, 3*time.Second, func() error {
+				var scrapeErr error
+				cardLists, scrapeErr = TAGScrapCards(setUrl.Link)
+				if scrapeErr != nil {
+					return scrapeErr
+				}
+				if len(cardLists.Cards) == 0 {
+					return fmt.Errorf("empty cards")
+				}
+				return nil
+			})
 			if err != nil {
-				return responseError(c, errcode.InternalServerError)
+				fmt.Printf("Skip TAG set %s after retries: %v\n", setUrl.Name, err)
+				continue
 			}
 
 			for x, card := range cardLists.Cards {
@@ -111,61 +130,65 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 						tag.SetNumber = ""
 					}
 
-						if err := h.TAG.Create(tag); err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
+					if err := h.TAG.Create(tag); err != nil {
+						fmt.Printf("TAG create error, skip card %s %s: %v\n", tag.CardNumber, tag.CardName, err)
+						continue
+					}
 
-						logging := model.NewTAGLogging()
-						logging.TagId = tag.Id
-						logging.CardName = name
-						logging.CardNumber = card.CardNumber
-						logging.SetName = result
-						logging.CardSet = setUrl.Name
-						logging.Rarity = rarity
-						logging.Total = card.Total
-						logging.GradeVA = card.GradeVA
-						logging.Grade1 = card.Grade1
-						logging.Grade1_5 = card.Grade1_5
-						logging.Grade2 = card.Grade2
-						logging.Grade2_5 = card.Grade2_5
-						logging.Grade3 = card.Grade3
-						logging.Grade3_5 = card.Grade3_5
-						logging.Grade4 = card.Grade4
-						logging.Grade4_5 = card.Grade4_5
-						logging.Grade5 = card.Grade5
-						logging.Grade5_5 = card.Grade5_5
-						logging.Grade6 = card.Grade6
-						logging.Grade6_5 = card.Grade6_5
-						logging.Grade7 = card.Grade7
-						logging.Grade7_5 = card.Grade7_5
-						logging.Grade8 = card.Grade8
-						logging.Grade8_5 = card.Grade8_5
-						logging.Grade9 = card.Grade9
-						logging.Grade10 = card.Grade10
-						logging.Grade10P = card.Grade10P
+					logging := model.NewTAGLogging()
+					logging.TagId = tag.Id
+					logging.CardName = name
+					logging.CardNumber = card.CardNumber
+					logging.SetName = result
+					logging.CardSet = setUrl.Name
+					logging.Rarity = rarity
+					logging.Total = card.Total
+					logging.GradeVA = card.GradeVA
+					logging.Grade1 = card.Grade1
+					logging.Grade1_5 = card.Grade1_5
+					logging.Grade2 = card.Grade2
+					logging.Grade2_5 = card.Grade2_5
+					logging.Grade3 = card.Grade3
+					logging.Grade3_5 = card.Grade3_5
+					logging.Grade4 = card.Grade4
+					logging.Grade4_5 = card.Grade4_5
+					logging.Grade5 = card.Grade5
+					logging.Grade5_5 = card.Grade5_5
+					logging.Grade6 = card.Grade6
+					logging.Grade6_5 = card.Grade6_5
+					logging.Grade7 = card.Grade7
+					logging.Grade7_5 = card.Grade7_5
+					logging.Grade8 = card.Grade8
+					logging.Grade8_5 = card.Grade8_5
+					logging.Grade9 = card.Grade9
+					logging.Grade10 = card.Grade10
+					logging.Grade10P = card.Grade10P
 
-						if len(parts) == 2 {
-							logging.SetNumber = strings.TrimSpace(parts[1])
-						}
+					if len(parts) == 2 {
+						logging.SetNumber = strings.TrimSpace(parts[1])
+					}
 
-						if err := h.TAGLogging.Create(logging); err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
+					if err := h.TAGLogging.Create(logging); err != nil {
+						fmt.Printf("TAG logging create error, skip card %s %s: %v\n", logging.CardNumber, logging.CardName, err)
+						continue
+					}
 
-						urlCheck := h.TAGUrl.GetByPath(setUrl.Link)
+					urlCheck := h.TAGUrl.GetByPath(setUrl.Link)
 
 					if !urlCheck {
 						tagUrl := model.NewTAGUrl()
 						tagUrl.Url = setUrl.Link
 
 						if err := h.TAGUrl.Create(tagUrl); err != nil {
-							return responseError(c, errcode.InternalServerError)
+							fmt.Printf("TAG url create error, continue: %v\n", err)
+							continue
 						}
 					}
 				} else {
 					dbTag, err := h.TAG.GetDetailByCardNameAndCardNumberAndSetName(name, card.CardNumber, setUrl.Name)
 					if err != nil {
-						return responseError(c, errcode.InternalServerError)
+						fmt.Printf("TAG detail lookup error, skip card %s %s: %v\n", card.CardNumber, name, err)
+						continue
 					}
 
 					logging := model.NewTAGLogging()
@@ -220,7 +243,8 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 					}
 
 					if err := h.TAGLogging.Create(logging); err != nil {
-						return responseError(c, errcode.InternalServerError)
+						fmt.Printf("TAG logging create error, skip card %s %s: %v\n", logging.CardNumber, logging.CardName, err)
+						continue
 					}
 				}
 
@@ -232,6 +256,9 @@ func (h *Handler) InsertTAG(c echo.Context) error {
 			time.Sleep(3 * time.Second)
 		}
 	}
+
+	fmt.Println("------------------------------")
+	fmt.Println("End of scrapping")
 
 	return responseJSON(c, true)
 }
@@ -297,7 +324,7 @@ func TAGScrapCards(url string) (TAGPopResponse, error) {
 	)
 
 	if err != nil {
-		log.Fatal(err)
+		return TAGPopResponse{}, err
 	}
 
 	fmt.Printf("Scraped %d cards successfully:\n", len(results.Cards))
@@ -347,7 +374,22 @@ type TAGYearSet struct {
 }
 
 func TAGScrapSet(yearUrl string) ([]TAGYearSet, error) {
-	ctx, cancel := chromedp.NewContext(context.Background())
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/google-chrome"),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 
 	ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -356,41 +398,83 @@ func TAGScrapSet(yearUrl string) ([]TAGYearSet, error) {
 	var results []TAGYearSet
 
 	err := chromedp.Run(ctx,
-		// 1. You must navigate to the URL first
 		chromedp.Navigate(yearUrl),
-
-		// 2. Wait for the table rows to actually load in the DOM
-		chromedp.WaitVisible(`tbody tr.MuiTableRow-root`, chromedp.ByQuery),
-
-		// 3. Optional: small sleep to ensure the links/text have fully "hydrated"
+		chromedp.WaitReady(`body`, chromedp.ByQuery),
 		chromedp.Sleep(2*time.Second),
-
-		// 4. Now run your JavaScript
-		chromedp.Evaluate(`
-            (() => {
-                const rows = Array.from(document.querySelectorAll('tbody tr.MuiTableRow-root'));
-                const baseUrl = "https://my.taggrading.com";
-                
-                return rows.map(row => {
-                    const cells = Array.from(row.querySelectorAll('td'));
-                    if (cells.length < 1) return null;
-
-                    const anchor = cells[0].querySelector('a');
-                    const bold   = cells[0].querySelector('b');
-
-                    return {
-                        // Ensure your TAGYearSet struct has 'json:"link"' tag
-                        link: anchor ? baseUrl + anchor.getAttribute('href') : "",
-                        // Adding name helps for debugging
-                        name: bold ? bold.innerText.trim() : "" 
-                    };
-                }).filter(item => item !== null && item.link !== "");
-            })()
-        `, &results),
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	scrapeSetJs := `
+		(() => {
+			const baseUrl = window.location.origin || "https://my.taggrading.com";
+			const seen = new Set();
+			const output = [];
+			const rowSelectors = [
+				'tbody tr.MuiTableRow-root',
+				'tr.MuiTableRow-root',
+				'table tbody tr',
+				'tbody tr'
+			];
+
+			const collect = (anchor, fallbackName) => {
+				if (!anchor) return;
+				const hrefRaw = anchor.getAttribute('href') || '';
+				if (!hrefRaw) return;
+
+				const link = new URL(hrefRaw, baseUrl).href;
+				if (!link.includes('/pop-report/')) return;
+				if (link === window.location.href) return;
+				if (seen.has(link)) return;
+
+				const name = (fallbackName || anchor.textContent || '')
+					.replace(/\s+/g, ' ')
+					.trim();
+
+				seen.add(link);
+				output.push({ link, name });
+			};
+
+			for (const selector of rowSelectors) {
+				const rows = Array.from(document.querySelectorAll(selector));
+				rows.forEach(row => {
+					const anchor = row.querySelector('a[href*="/pop-report/"]');
+					const bold = row.querySelector('b');
+					const firstCell = row.querySelector('td');
+					const fallbackName = (bold && bold.textContent) || (firstCell && firstCell.textContent) || '';
+					collect(anchor, fallbackName);
+				});
+			}
+
+			// Fallback for layouts where links are not inside table rows.
+			if (output.length === 0) {
+				const links = Array.from(document.querySelectorAll('a[href*="/pop-report/"]'));
+				links.forEach(anchor => collect(anchor, anchor.textContent || ''));
+			}
+
+			return output;
+		})()
+	`
+
+	// Retry several times for SPA hydration / delayed data load.
+	for attempt := 0; attempt < 8; attempt++ {
+		results = nil
+		err = chromedp.Run(ctx, chromedp.Evaluate(scrapeSetJs, &results))
+		if err != nil {
+			return nil, err
+		}
+
+		if len(results) > 0 {
+			break
+		}
+
+		time.Sleep(1500 * time.Millisecond)
+	}
+
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no sets found from %s", yearUrl)
 	}
 
 	fmt.Printf("Scraped %d sets successfully:\n", len(results))

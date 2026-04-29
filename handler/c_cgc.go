@@ -22,8 +22,6 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 		return responseValidationError(c, msg)
 	}
 
-	fmt.Println("Start")
-
 	lists, err := CGCScrapList(i.Url)
 	if err != nil {
 		fmt.Println(err)
@@ -35,9 +33,15 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 	for z, list := range lists {
 		fmt.Printf("%d/%d List \n", z+1, len(lists))
 
-		sets, err := CGCScrapSets(list.URL)
+		var sets []CGCSetData
+		err := retryWithBackoff(fmt.Sprintf("cgc scrape sets list %d", z+1), 3, 3*time.Second, func() error {
+			var scrapeErr error
+			sets, scrapeErr = CGCScrapSets(list.URL)
+			return scrapeErr
+		})
 		if err != nil {
-			return responseError(c, errcode.InternalServerError)
+			fmt.Printf("Skip list %d after retries: %v\n", z+1, err)
+			continue
 		}
 
 		time.Sleep(3 * time.Second)
@@ -46,9 +50,25 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 			fmt.Printf("%d/%d Set \n", y+1, len(sets))
 			fmt.Println("Set: ", set.SetName)
 
-			cards, err := CGCScrapCards(set.SetUrl)
+			var cards []CGCCardFullData
+			err := retryWithBackoff(fmt.Sprintf("cgc scrape cards set %s", set.SetName), 3, 3*time.Second, func() error {
+				var scrapeErr error
+				cards, scrapeErr = CGCScrapCards(set.SetUrl)
+				if scrapeErr != nil {
+					return scrapeErr
+				}
+				if len(cards) == 0 {
+					return fmt.Errorf("empty cards")
+				}
+				return nil
+			})
 			if err != nil {
-				return responseError(c, errcode.InternalServerError)
+				fmt.Printf("Skip set %s after retries: %v\n", set.SetName, err)
+				continue
+			}
+
+			if len(cards) == 800 {
+				cards = cards[:50]
 			}
 
 			for x, card := range cards {
@@ -57,19 +77,26 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 				cgc := model.NewCGC()
 				cgc.SetName = card.SetName
 				cgc.Total = card.TotalGraded
+
 				idx := strings.Index(card.CardName, ")")
-				cgc.CardName = strings.TrimSpace(card.CardName[:idx+1])
-				cgc.Rarity = strings.TrimSpace(card.CardName[idx+1:])
+				if idx == -1 {
+					cgc.CardName = strings.TrimSpace(card.CardName)
+					cgc.Rarity = ""
+				} else {
+					cgc.CardName = strings.TrimSpace(card.CardName[:idx+1])
+					cgc.Rarity = strings.TrimSpace(card.CardName[idx+1:])
+				}
+
 				cgc.CardNumber = card.CardNumber
 				parts := strings.Split(card.CardNumber, "/")
 				if len(parts) == 2 {
-					cgc.CardNumber = parts[0]
-					cgc.SetNumber = parts[1]
+					cgc.CardNumber = strings.TrimSpace(parts[0])
+					cgc.SetNumber = strings.TrimSpace(parts[1])
 				}
 
-				check := h.CGC.CheckCardNameAndCardNumberAndSetNameAndRarity(cgc.CardName, cgc.CardNumber, cgc.SetName, cgc.Rarity)
+				exists := h.CGC.CheckCardNameAndCardNumberAndSetNameAndRarity(cgc.CardName, cgc.CardNumber, cgc.SetName, cgc.Rarity)
 
-				if !check {
+				if !exists {
 					for _, grade := range card.Grades {
 						switch grade.Grade {
 						case "1":
@@ -124,8 +151,151 @@ func (h *Handler) InsertCGC(c echo.Context) error {
 					}
 
 					if err := h.CGC.Create(cgc); err != nil {
-						return responseError(c, errcode.InternalServerError)
+						fmt.Printf("CGC create error, skip card %s %s: %v\n", cgc.CardNumber, cgc.CardName, err)
+						continue
 					}
+
+					logging := model.NewCGCLogging()
+					logging.CGCId = cgc.Id
+					logging.CardName = cgc.CardName
+					logging.CardNumber = cgc.CardNumber
+					logging.SetNumber = cgc.SetNumber
+					logging.SetName = cgc.SetName
+					logging.Rarity = cgc.Rarity
+					logging.Total = cgc.Total
+
+					for _, grade := range card.Grades {
+						switch grade.Grade {
+						case "1":
+							logging.Grade1 = grade.Count
+						case "1.5":
+							logging.Grade1_5 = grade.Count
+						case "2":
+							logging.Grade2 = grade.Count
+						case "2.5":
+							logging.Grade2_5 = grade.Count
+						case "3":
+							logging.Grade3 = grade.Count
+						case "3.5":
+							logging.Grade3_5 = grade.Count
+						case "4":
+							logging.Grade4 = grade.Count
+						case "4.5":
+							logging.Grade4_5 = grade.Count
+						case "5":
+							logging.Grade5 = grade.Count
+						case "5.5":
+							logging.Grade5_5 = grade.Count
+						case "6":
+							logging.Grade6 = grade.Count
+						case "6.5":
+							logging.Grade6_5 = grade.Count
+						case "7":
+							logging.Grade7 = grade.Count
+						case "7.5":
+							logging.Grade7_5 = grade.Count
+						case "8":
+							logging.Grade8 = grade.Count
+						case "8.5":
+							logging.Grade8_5 = grade.Count
+						case "9":
+							logging.Grade9 = grade.Count
+						case "Mint+ 9.5":
+							logging.Grade9_5 = grade.Count
+						case "Gem Mint 10":
+							logging.Grade10 = grade.Count
+						case "Pristine 10":
+							logging.Grade10P = grade.Count
+						case "AU":
+							continue
+						case "AA":
+							continue
+						case "Perfect 10":
+							continue
+						default:
+							continue
+						}
+					}
+
+					if err := h.CGCLogging.Create(logging); err != nil {
+						fmt.Printf("CGC logging create error, skip card %s %s: %v\n", cgc.CardNumber, cgc.CardName, err)
+						continue
+					}
+
+					continue
+				}
+
+				dbCGC, err := h.CGC.GetByCardNameAndCardNumberAndSetNameAndRarity(cgc.CardName, cgc.CardNumber, cgc.SetName, cgc.Rarity)
+				if err != nil {
+					fmt.Printf("CGC detail fetch error, skip card %s %s: %v\n", cgc.CardNumber, cgc.CardName, err)
+					continue
+				}
+
+				logging := model.NewCGCLogging()
+				logging.CGCId = dbCGC.Id
+				logging.CardName = cgc.CardName
+				logging.CardNumber = cgc.CardNumber
+				logging.SetNumber = cgc.SetNumber
+				logging.SetName = cgc.SetName
+				logging.Rarity = cgc.Rarity
+				logging.Total = cgc.Total
+
+				for _, grade := range card.Grades {
+					switch grade.Grade {
+					case "1":
+						logging.Grade1 = grade.Count
+					case "1.5":
+						logging.Grade1_5 = grade.Count
+					case "2":
+						logging.Grade2 = grade.Count
+					case "2.5":
+						logging.Grade2_5 = grade.Count
+					case "3":
+						logging.Grade3 = grade.Count
+					case "3.5":
+						logging.Grade3_5 = grade.Count
+					case "4":
+						logging.Grade4 = grade.Count
+					case "4.5":
+						logging.Grade4_5 = grade.Count
+					case "5":
+						logging.Grade5 = grade.Count
+					case "5.5":
+						logging.Grade5_5 = grade.Count
+					case "6":
+						logging.Grade6 = grade.Count
+					case "6.5":
+						logging.Grade6_5 = grade.Count
+					case "7":
+						logging.Grade7 = grade.Count
+					case "7.5":
+						logging.Grade7_5 = grade.Count
+					case "8":
+						logging.Grade8 = grade.Count
+					case "8.5":
+						logging.Grade8_5 = grade.Count
+					case "9":
+						logging.Grade9 = grade.Count
+					case "Mint+ 9.5":
+						logging.Grade9_5 = grade.Count
+					case "Gem Mint 10":
+						logging.Grade10 = grade.Count
+					case "Pristine 10":
+						logging.Grade10P = grade.Count
+					case "AU":
+						continue
+					case "AA":
+						continue
+					case "Perfect 10":
+						continue
+					default:
+						continue
+					}
+				}
+
+				if err := h.CGCLogging.Create(logging); err != nil {
+					fmt.Printf("CGC logging create error, skip card %s %s: %v\n", cgc.CardNumber, cgc.CardName, err)
+					continue
 				}
 			}
 
@@ -143,9 +313,15 @@ type CGCListData struct {
 
 func CGCScrapList(url string) ([]CGCListData, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/google-chrome"),
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -183,9 +359,15 @@ type CGCSetData struct {
 
 func CGCScrapSets(url string) ([]CGCSetData, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/google-chrome"),
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -290,9 +472,15 @@ type CGCCardFullData struct {
 
 func CGCScrapCards(url string) ([]CGCCardFullData, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/google-chrome"),
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)

@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"pkm/errcode"
 	"pkm/model"
 	"pkm/utils"
 	"strings"
@@ -11,6 +10,11 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/labstack/echo/v4"
+)
+
+const (
+	psaRetryAttempts = 3
+	psaRetryDelay    = 3 * time.Second
 )
 
 func (h *Handler) InsertPSA(c echo.Context) error {
@@ -25,10 +29,15 @@ func (h *Handler) InsertPSA(c echo.Context) error {
 	for a, url := range i.Urls {
 		fmt.Println("Url: ", a+1)
 
-		sets, err := PSAScrapYear(url)
+		var sets []PSASet
+		err := retryWithBackoff(fmt.Sprintf("scrape year url[%d]", a+1), psaRetryAttempts, psaRetryDelay, func() error {
+			var scrapeErr error
+			sets, scrapeErr = PSAScrapYear(url)
+			return scrapeErr
+		})
 		if err != nil {
-			fmt.Println(err)
-			return responseError(c, errcode.InternalServerError)
+			fmt.Printf("Skip URL after retries: %s, error: %v\n", url, err)
+			continue
 		}
 
 		time.Sleep(5 * time.Second)
@@ -44,120 +53,44 @@ func (h *Handler) InsertPSA(c echo.Context) error {
 		}
 
 		for xxx, newSet := range newSets {
+			// if xxx < 11 {
+			// 	continue
+			// }
+
 			fmt.Println("Length: ", len(newSets))
 			fmt.Println("Current: ", xxx+1)
 			fmt.Println("Set: ", newSet.Name)
 
-			cards, _ := PSAScrapSet(newSet.Link)
+			var cards []PSACardData
+			err := retryWithBackoff(fmt.Sprintf("scrape set %s", newSet.Name), psaRetryAttempts, psaRetryDelay, func() error {
+				var scrapeErr error
+				cards, scrapeErr = PSAScrapSet(newSet.Link)
+				if scrapeErr != nil {
+					return scrapeErr
+				}
+				if len(cards) == 0 {
+					return fmt.Errorf("empty cards from set: %s", newSet.Name)
+				}
+				return nil
+			})
+			if err != nil {
+				fmt.Printf("Skip set after retries: %s, error: %v\n", newSet.Name, err)
+				continue
+			}
 
 			if len(cards) != 0 {
 				for ccc, card := range cards {
-					fmt.Printf("%d of %d cards \n", ccc+1, len(cards))
-					check := h.PSA.GetByCardNameAndCardNumberAndDescriptionAndSet(card.CardName, card.CardNumber, card.Description, newSet.Name)
+					fmt.Printf("Url %d, Set %d, %d of %d cards \n", a+1, xxx+1, ccc+1, len(cards))
 
-					if !check {
-						psa := model.NewPSA()
-						psa.CardNumber = card.CardNumber
-						psa.CardName = card.CardName
-						psa.Description = card.Description
-						psa.SetName = newSet.Name
-						psa.Total = card.Total
-						psa.Grade1 = card.Grade1
-						psa.Grade2 = card.Grade2
-						psa.Grade3 = card.Grade3
-						psa.Grade4 = card.Grade4
-						psa.Grade5 = card.Grade5
-						psa.Grade6 = card.Grade6
-						psa.Grade7 = card.Grade7
-						psa.Grade8 = card.Grade8
-						psa.Grade9 = card.Grade9
-						psa.Grade10 = card.Grade10
-
-						if err := h.PSA.Create(psa); err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
-
-						logging := model.NewPSALogging()
-						logging.PSAId = psa.Id
-						logging.CardNumber = card.CardNumber
-						logging.CardName = card.CardName
-						logging.Description = card.Description
-						logging.SetName = newSet.Name
-						logging.Total = card.Total
-						logging.Grade1 = card.Grade1
-						logging.Grade2 = card.Grade2
-						logging.Grade3 = card.Grade3
-						logging.Grade4 = card.Grade4
-						logging.Grade5 = card.Grade5
-						logging.Grade6 = card.Grade6
-						logging.Grade7 = card.Grade7
-						logging.Grade8 = card.Grade8
-						logging.Grade9 = card.Grade9
-						logging.Grade10 = card.Grade10
-
-						if err := h.PSALogging.Create(logging); err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
-
-						urlCheck := h.PSAUrl.GetByPath(newSet.Link)
-
-						if !urlCheck {
-							psaUrl := model.NewPSAUrl()
-							psaUrl.SetName = newSet.Name
-							psaUrl.Url = newSet.Link
-
-							if err := h.PSAUrl.Create(psaUrl); err != nil {
-								return responseError(c, errcode.InternalServerError)
-							}
-						}
-					} else {
-						dbPSA, err := h.PSA.GetDetailByCardNameAndCardNumberAndDescription(card.CardName, card.CardNumber, card.Description)
-						if err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
-
-						logging := model.NewPSALogging()
-						if dbPSA != nil && dbPSA.Id != "" {
-							logging.PSAId = dbPSA.Id
-						}
-
-						logging.CardNumber = card.CardNumber
-						logging.CardName = card.CardName
-						logging.Description = card.Description
-						logging.SetName = newSet.Name
-						logging.Total = card.Total
-						logging.Grade1 = card.Grade1
-						logging.Grade2 = card.Grade2
-						logging.Grade3 = card.Grade3
-						logging.Grade4 = card.Grade4
-						logging.Grade5 = card.Grade5
-						logging.Grade6 = card.Grade6
-						logging.Grade7 = card.Grade7
-						logging.Grade8 = card.Grade8
-						logging.Grade9 = card.Grade9
-						logging.Grade10 = card.Grade10
-
-						if dbPSA != nil && dbPSA.Id != "" {
-							if dbPSA.SetName != "" {
-								logging.SetName = dbPSA.SetName
-							}
-							if dbPSA.SetNumber != "" {
-								logging.SetNumber = dbPSA.SetNumber
-							}
-							if dbPSA.Rarity != "" {
-								logging.Rarity = dbPSA.Rarity
-							}
-							if dbPSA.SpecID != "" {
-								logging.SpecID = dbPSA.SpecID
-							}
-							if dbPSA.Auth != "" {
-								logging.Auth = dbPSA.Auth
-							}
-						}
-
-						if err := h.PSALogging.Create(logging); err != nil {
-							return responseError(c, errcode.InternalServerError)
-						}
+					// if ccc < 15 {
+					// 	continue
+					// }
+					err := retryWithBackoff(fmt.Sprintf("save card %s %s", card.CardNumber, card.CardName), psaRetryAttempts, psaRetryDelay, func() error {
+						return h.savePSACard(newSet, card)
+					})
+					if err != nil {
+						fmt.Printf("Skip card after retries: %s %s, error: %v\n", card.CardNumber, card.CardName, err)
+						continue
 					}
 				}
 			} else {
@@ -170,16 +103,148 @@ func (h *Handler) InsertPSA(c echo.Context) error {
 		time.Sleep(5 * time.Second)
 	}
 
+	fmt.Println("----------------------")
+	fmt.Println("End Scrap PSA")
+
 	return responseJSON(c, true)
+}
+
+func retryWithBackoff(name string, attempts int, delay time.Duration, fn func() error) error {
+	var lastErr error
+	for try := 1; try <= attempts; try++ {
+		if err := fn(); err != nil {
+			lastErr = err
+			fmt.Printf("[%s] attempt %d/%d failed: %v\n", name, try, attempts, err)
+			if try < attempts {
+				time.Sleep(delay)
+			}
+			continue
+		}
+		return nil
+	}
+
+	return fmt.Errorf("%s failed after %d attempts: %w", name, attempts, lastErr)
+}
+
+func (h *Handler) savePSACard(newSet PSASet, card PSACardData) error {
+	check := h.PSA.GetByCardNameAndCardNumberAndDescriptionAndSet(card.CardName, card.CardNumber, card.Description, newSet.Name)
+
+	if !check {
+		psa := model.NewPSA()
+		psa.CardNumber = card.CardNumber
+		psa.CardName = card.CardName
+		psa.Description = card.Description
+		psa.SetName = newSet.Name
+		psa.Total = card.Total
+		psa.Grade1 = card.Grade1
+		psa.Grade2 = card.Grade2
+		psa.Grade3 = card.Grade3
+		psa.Grade4 = card.Grade4
+		psa.Grade5 = card.Grade5
+		psa.Grade6 = card.Grade6
+		psa.Grade7 = card.Grade7
+		psa.Grade8 = card.Grade8
+		psa.Grade9 = card.Grade9
+		psa.Grade10 = card.Grade10
+
+		if err := h.PSA.Create(psa); err != nil {
+			return err
+		}
+
+		logging := model.NewPSALogging()
+		logging.PSAId = psa.Id
+		logging.CardNumber = card.CardNumber
+		logging.CardName = card.CardName
+		logging.Description = card.Description
+		logging.SetName = newSet.Name
+		logging.Total = card.Total
+		logging.Grade1 = card.Grade1
+		logging.Grade2 = card.Grade2
+		logging.Grade3 = card.Grade3
+		logging.Grade4 = card.Grade4
+		logging.Grade5 = card.Grade5
+		logging.Grade6 = card.Grade6
+		logging.Grade7 = card.Grade7
+		logging.Grade8 = card.Grade8
+		logging.Grade9 = card.Grade9
+		logging.Grade10 = card.Grade10
+
+		if err := h.PSALogging.Create(logging); err != nil {
+			return err
+		}
+
+		urlCheck := h.PSAUrl.GetByPath(newSet.Link)
+		if !urlCheck {
+			psaURL := model.NewPSAUrl()
+			psaURL.SetName = newSet.Name
+			psaURL.Url = newSet.Link
+
+			if err := h.PSAUrl.Create(psaURL); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	dbPSA, err := h.PSA.GetDetailByCardNameAndCardNumberAndDescription(card.CardName, card.CardNumber, card.Description)
+	if err != nil {
+		return err
+	}
+
+	logging := model.NewPSALogging()
+	if dbPSA != nil && dbPSA.Id != "" {
+		logging.PSAId = dbPSA.Id
+	}
+
+	logging.CardNumber = card.CardNumber
+	logging.CardName = card.CardName
+	logging.Description = card.Description
+	logging.SetName = newSet.Name
+	logging.Total = card.Total
+	logging.Grade1 = card.Grade1
+	logging.Grade2 = card.Grade2
+	logging.Grade3 = card.Grade3
+	logging.Grade4 = card.Grade4
+	logging.Grade5 = card.Grade5
+	logging.Grade6 = card.Grade6
+	logging.Grade7 = card.Grade7
+	logging.Grade8 = card.Grade8
+	logging.Grade9 = card.Grade9
+	logging.Grade10 = card.Grade10
+
+	if dbPSA != nil && dbPSA.Id != "" {
+		if dbPSA.SetName != "" {
+			logging.SetName = dbPSA.SetName
+		}
+		if dbPSA.SetNumber != "" {
+			logging.SetNumber = dbPSA.SetNumber
+		}
+		if dbPSA.Rarity != "" {
+			logging.Rarity = dbPSA.Rarity
+		}
+		if dbPSA.SpecID != "" {
+			logging.SpecID = dbPSA.SpecID
+		}
+		if dbPSA.Auth != "" {
+			logging.Auth = dbPSA.Auth
+		}
+	}
+
+	return h.PSALogging.Create(logging)
 }
 
 func PSAScrapYear(url string) ([]PSASet, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("/usr/bin/google-chrome"),
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		// "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
-		// "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -273,12 +338,15 @@ func PSAScrapYear(url string) ([]PSASet, error) {
 }
 
 func PSAScrapSet(url string) ([]PSACardData, error) {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+	opts := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.ExecPath("/usr/bin/google-chrome"),
 		chromedp.Flag("headless", true),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		// Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0
-		// Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
-		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("window-size", "1920,1080"),
+		chromedp.Flag("headless", true),
+		// chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		// chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)

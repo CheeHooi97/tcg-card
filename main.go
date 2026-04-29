@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"pkm/config"
-	"pkm/database"
 	"pkm/handler"
 	"pkm/repository"
 	"pkm/router"
@@ -41,10 +40,10 @@ func main() {
 	}
 
 	// Auto-migrate
-	err = database.Migrate(db)
-	if err != nil {
-		log.Fatal("Failed to migrate database:", err)
-	}
+	// err = database.Migrate(db)
+	// if err != nil {
+	// 	log.Fatal("Failed to migrate database:", err)
+	// }
 
 	// Initialize repository
 	repos := repository.InitializeRepository(db)

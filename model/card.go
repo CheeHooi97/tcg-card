@@ -12,6 +12,7 @@ type Card struct {
 	SetNumber string `json:"setNumber"`
 	SetName   string `json:"setName"`
 	Rarity    string `json:"rarity"`
+	CardType  string `json:"cardType"`
 	Ungrade   string `json:"ungrade"`
 	Grade7    string `json:"grade7"`
 	Grade8    string `json:"grade8"`

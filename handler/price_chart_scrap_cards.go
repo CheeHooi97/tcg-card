@@ -69,7 +69,6 @@ func (h *Handler) PriceChartCards(c echo.Context) error {
 			// if z < 200 {
 			// 	continue
 			// }
-			// 420 cards
 
 			// get card detail of each card
 			cardDetail, err := ScrapCardDetails(card.Link)
@@ -99,6 +98,7 @@ func (h *Handler) PriceChartCards(c echo.Context) error {
 				ca.SetName = cardDetail.SetName
 				ca.PhotoUrl = fileName
 				ca.Ungrade = card.Price
+				ca.CardType = "Pokemon"
 				ca.Grade7 = cardDetail.Grade7
 				ca.Grade8 = cardDetail.Grade8
 				ca.Grade9 = cardDetail.Grade9
