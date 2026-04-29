@@ -43,15 +43,19 @@ func SetupRoutes(h *handler.Handler, db *gorm.DB) *echo.Echo {
 
 	psa := provider.Group("/psa")
 	psa.POST("", h.InsertPSA)
+	psa.POST("-v2", h.InsertPSAV2)
 
 	tag := provider.Group("/tag")
 	tag.POST("", h.InsertTAG)
+	tag.POST("-v2", h.InsertTAGV2)
 
 	bgs := provider.Group("/bgs")
 	bgs.POST("", h.InsertBGS)
+	bgs.POST("-v2", h.InsertBGSV2)
 
 	cgc := provider.Group("/cgc")
 	cgc.POST("", h.InsertCGC)
+	cgc.POST("-v2", h.InsertCGCV2)
 
 	priceCharting := provider.Group("/pricecharting")
 	priceCharting.POST("", h.PriceChartCards)
