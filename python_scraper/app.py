@@ -3,11 +3,16 @@ import random
 import time
 from datetime import datetime, timezone
 from typing import Any
+from pathlib import Path
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from playwright.async_api import async_playwright, TimeoutError as PWTimeoutError
 import psycopg
+from dotenv import load_dotenv
+
+load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 app = FastAPI(title="TCG Python Scraper")
 
@@ -53,14 +58,31 @@ def unique_id() -> str:
     return f"{int(time.time())}{random.randint(100000, 999999)}"
 
 
-def db_dsn() -> str:
+def db_config() -> dict[str, Any]:
     import os
     host = os.getenv("POSTGRES_HOST", "127.0.0.1")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    user = os.getenv("POSTGRES_USER", "")
+    port = int(os.getenv("POSTGRES_PORT", "5432"))
+    user = os.getenv("POSTGRES_USER", "").strip()
     password = os.getenv("POSTGRES_PASSWORD", "")
-    dbname = os.getenv("POSTGRES_DATABASE", "")
-    return f"host={host} port={port} user={user} password={password} dbname={dbname} sslmode=disable"
+    dbname = os.getenv("POSTGRES_DATABASE", "").strip()
+    sslmode = os.getenv("POSTGRES_SSLMODE", "disable").strip() or "disable"
+
+    missing = []
+    if not user:
+        missing.append("POSTGRES_USER")
+    if not dbname:
+        missing.append("POSTGRES_DATABASE")
+    if missing:
+        raise RuntimeError(f"missing required DB env: {', '.join(missing)}")
+
+    return {
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "dbname": dbname,
+        "sslmode": sslmode,
+    }
 
 
 def split_set_number(card_number: str) -> tuple[str, str]:
@@ -95,7 +117,7 @@ def save_psa_card(set_name: str, set_link: str, card: dict[str, Any]) -> None:
         "grade10": str(card.get("grade10", "0")),
     }
 
-    with psycopg.connect(db_dsn()) as conn:
+    with psycopg.connect(**db_config()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
