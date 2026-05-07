@@ -150,7 +150,9 @@ async def scrape_pricechart(browser, year_url: str):
     failed = []
     sets = await scrape_sets(browser, year_url)
     inserted = 0
-    for s in sets:
+    for y, s in enumerate(sets):
+        if y != 142:
+            continue
         set_link = s.get("link", "")
         if not set_link:
             continue
@@ -159,7 +161,9 @@ async def scrape_pricechart(browser, year_url: str):
         except Exception as e:
             failed.append({"set": s.get("name", ""), "error": str(e)})
             continue
-        for card in cards:
+        for z, card in enumerate(cards):
+            if z < 302:
+                continue
             try:
                 detail = await scrape_card_detail(browser, card.get("link", ""))
                 created = await asyncio.to_thread(save_card_and_price, card, detail)

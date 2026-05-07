@@ -7,7 +7,6 @@ import (
 	"pkm/errcode"
 	"pkm/kit/oss"
 	"pkm/model"
-	"pkm/utils"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -19,116 +18,156 @@ func (h *Handler) PriceChartCards(c echo.Context) error {
 		Url string `json:"url" validate:"required"`
 	}
 
-	if msg, err := utils.ValidateRequest(c, &i); err != nil {
-		return responseValidationError(c, msg)
+	if err := c.Bind(&i); err != nil {
+		return responseValidationError(c, "invalid request body")
 	}
 
-	// detail, err := h.Card.GetById("1768799412640396734")
-	// if err != nil {
-	// 	return responseError(c, errcode.InternalServerError)
-	// }
+	if i.Url == "" {
+		return responseValidationError(c, "url is required")
+	}
 
-	// url, err := oss.GetSignURL(config.OSSBucket, detail.PhotoUrl)
+	const maxRetry = 3
+	const retryWait = 5 * time.Second
+	hadAnySuccess := false
 
-	// fmt.Println("url:", url)
-
-	// get all sets link
-	sets, err := PriceChartScrapSet(i.Url)
+	var sets []PriceChartSet
+	err := withRetry(fmt.Sprintf("url: %s", i.Url), maxRetry, retryWait, func() error {
+		var err error
+		sets, err = PriceChartScrapSet(i.Url)
+		return err
+	})
 	if err != nil {
 		return responseError(c, errcode.InternalServerError)
 	}
 
 	time.Sleep(3 * time.Second)
 
-	// loop each set
 	for y, set := range sets {
 		fmt.Printf("%d/%d sets \n", y+1, len(sets))
 
-		// if y < 18 {
-		// 	continue
-		// }
-
-		// if y != 21 {
-		// 	continue
-		// }
-
-		// get cards list of each set
-		cards, err := ScrapPriceChartCards(set.Link)
-		if err != nil {
-			return responseError(c, errcode.InternalServerError)
+		if y != 142 {
+			continue
 		}
 
-		time.Sleep(3 * time.Second)
+		var cards []CardData
+		err := withRetry(fmt.Sprintf("set %d/%d (%s)", y+1, len(sets), set.Link), maxRetry, retryWait, func() error {
+			var err error
+			cards, err = ScrapPriceChartCards(set.Link)
+			return err
+		})
+		if err != nil {
+			fmt.Printf("skip set after retries: %v\n", err)
+			continue
+		}
 
-		// get card detail of each card
+		time.Sleep(5 * time.Second)
+
 		for z, card := range cards {
-			fmt.Printf("%d/%d cards \n", z+1, len(cards))
-
+			fmt.Printf("Set %d | %d/%d Cards \n", y+1, z+1, len(cards))
 			fmt.Println("card:", card)
 
-			// if z < 200 {
-			// 	continue
-			// }
+			if z < 302 {
+				continue
+			}
 
-			// get card detail of each card
-			cardDetail, err := ScrapCardDetails(card.Link)
+			err := withRetry(fmt.Sprintf("card %d/%d (%s)", z+1, len(cards), card.Link), maxRetry, retryWait, func() error {
+				return h.processPriceChartCard(card)
+			})
 			if err != nil {
-				return responseError(c, errcode.InternalServerError)
+				fmt.Printf("skip card after retries: %v\n", err)
+				continue
 			}
 
-			fmt.Println("cardDetail:", cardDetail)
-
-			check := h.Card.GetByCardNameAndSet(card.Name, cardDetail.SetName)
-
-			if !check {
-				ca := model.NewCard()
-
-				fileByte, fileName, err := oss.ProcessImageUrl(cardDetail.ImageURL, ca.Id)
-				if err != nil {
-					return responseError(c, errcode.InternalServerError)
-				}
-
-				fmt.Println("Name: ", fileName)
-
-				if err := oss.Upload(config.OSSBucket, fileName, fileByte); err != nil {
-					return responseError(c, errcode.InternalServerError)
-				}
-
-				ca.Name = card.Name
-				ca.SetName = cardDetail.SetName
-				ca.PhotoUrl = fileName
-				ca.Ungrade = card.Price
-				ca.CardType = "Pokemon"
-				ca.Grade7 = cardDetail.Grade7
-				ca.Grade8 = cardDetail.Grade8
-				ca.Grade9 = cardDetail.Grade9
-				ca.Grade9_5 = cardDetail.Grade9_5
-				ca.Grade10 = cardDetail.Grade10
-				if err := h.Card.Create(ca); err != nil {
-					return responseError(c, errcode.InternalServerError)
-				}
-
-				cardPrice := model.NewCardPrice()
-				cardPrice.CardId = ca.Id
-				cardPrice.Name = card.Name
-				cardPrice.Set = cardDetail.SetName
-				cardPrice.Ungrade = cardDetail.Ungraded
-				cardPrice.Grade7 = cardDetail.Grade7
-				cardPrice.Grade8 = cardDetail.Grade8
-				cardPrice.Grade9 = cardDetail.Grade9
-				cardPrice.Grade9_5 = cardDetail.Grade9_5
-				cardPrice.Grade10 = cardDetail.Grade10
-
-				if err := h.CardPrice.Create(cardPrice); err != nil {
-					return responseError(c, errcode.InternalServerError)
-				}
-			}
-			time.Sleep(3 * time.Second)
+			hadAnySuccess = true
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(5 * time.Second)
+	}
+
+	if !hadAnySuccess {
+		return responseError(c, errcode.InternalServerError)
 	}
 
 	return responseJSON(c, true)
+}
+
+func withRetry(label string, maxRetry int, wait time.Duration, fn func() error) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxRetry; attempt++ {
+		if err := fn(); err == nil {
+			if attempt > 1 {
+				fmt.Printf("[retry-success] %s on attempt %d/%d\n", label, attempt, maxRetry)
+			}
+			return nil
+		} else {
+			lastErr = err
+			fmt.Printf("[retry] %s failed (%d/%d): %v\n", label, attempt, maxRetry, err)
+		}
+
+		if attempt < maxRetry {
+			time.Sleep(wait)
+		}
+	}
+
+	return fmt.Errorf("%s failed after %d attempts: %w", label, maxRetry, lastErr)
+}
+
+func (h *Handler) processPriceChartCard(card CardData) error {
+	cardDetail, err := ScrapCardDetails(card.Link)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("cardDetail:", cardDetail)
+
+	check := h.Card.GetByCardNameAndSet(card.Name, cardDetail.SetName)
+	if check {
+		return nil
+	}
+
+	ca := model.NewCard()
+
+	fileByte, fileName, err := oss.ProcessImageUrl(cardDetail.ImageURL, ca.Id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Name: ", fileName)
+
+	if err := oss.Upload(config.OSSBucket, fileName, fileByte); err != nil {
+		return err
+	}
+
+	ca.Name = card.Name
+	ca.SetName = cardDetail.SetName
+	ca.PhotoUrl = fileName
+	ca.Ungrade = card.Price
+	ca.CardType = "Pokemon"
+	ca.Grade7 = cardDetail.Grade7
+	ca.Grade8 = cardDetail.Grade8
+	ca.Grade9 = cardDetail.Grade9
+	ca.Grade9_5 = cardDetail.Grade9_5
+	ca.Grade10 = cardDetail.Grade10
+	if err := h.Card.Create(ca); err != nil {
+		return err
+	}
+
+	cardPrice := model.NewCardPrice()
+	cardPrice.CardId = ca.Id
+	cardPrice.Name = card.Name
+	cardPrice.Set = cardDetail.SetName
+	cardPrice.Ungrade = cardDetail.Ungraded
+	cardPrice.Grade7 = cardDetail.Grade7
+	cardPrice.Grade8 = cardDetail.Grade8
+	cardPrice.Grade9 = cardDetail.Grade9
+	cardPrice.Grade9_5 = cardDetail.Grade9_5
+	cardPrice.Grade10 = cardDetail.Grade10
+
+	if err := h.CardPrice.Create(cardPrice); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type PriceChartSet struct {
@@ -384,6 +423,7 @@ func ScrapCardDetails(urlLink string) (*FullCardDetails, error) {
                 };
             })()
         `, &result),
+		chromedp.Sleep(5*time.Second),
 	)
 
 	if err != nil {

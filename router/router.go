@@ -34,6 +34,7 @@ func SetupRoutes(h *handler.Handler, db *gorm.DB) *echo.Echo {
 	// Card
 	card := v.Group("/card")
 	card.POST("/search", h.SearchCard)
+	card.POST("/scan", h.ScanCard)
 	card.GET("/detail", h.CardDetail)
 	card.POST("/update", h.CardUpdate)
 	card.POST("/update/setNumber", h.CardUpdateSetNumber)
