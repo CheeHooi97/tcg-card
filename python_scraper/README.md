@@ -23,6 +23,7 @@ uvicorn app:app --host 0.0.0.0 --port 8010
 - `POST /scrape/cgc` body: `{"url":"https://www.cgccards.com/population-report/..." }`
 - `POST /scrape/psa` body: `{"urls":["https://www.psacard.com/pop/..."]}`
 - `POST /scrape/tag` body: `{"urls":["https://my.taggrading.com/pop-report/..."]}`
+- `POST /scrape/pricecharting` body: `{"url":"https://www.pricecharting.com/console/pokemon-cards"}`
 
 All scrape endpoints retry failed items and continue until all inputs are processed.
 

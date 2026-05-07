@@ -16,3 +16,6 @@ class PSARequest(BaseModel):
 class TAGRequest(BaseModel):
     urls: list[str] = Field(default_factory=list)
 
+
+class PriceChartRequest(BaseModel):
+    url: str

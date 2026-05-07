@@ -3,8 +3,9 @@ from playwright.async_api import async_playwright
 
 from bgs_scraper import scrape_bgs
 from cgc_scraper import scrape_cgc
+from pricechart_scraper import scrape_pricechart
 from psa_scraper import scrape_psa
-from schemas import BGSRequest, CGCRequest, PSARequest, TAGRequest
+from schemas import BGSRequest, CGCRequest, PSARequest, PriceChartRequest, TAGRequest
 from tag_scraper import scrape_tag
 
 app = FastAPI(title="TCG Python Scraper")
@@ -54,3 +55,12 @@ async def tag(req: TAGRequest):
         finally:
             await browser.close()
 
+
+@app.post("/scrape/pricecharting")
+async def pricecharting(req: PriceChartRequest):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        try:
+            return await scrape_pricechart(browser, req.url)
+        finally:
+            await browser.close()
