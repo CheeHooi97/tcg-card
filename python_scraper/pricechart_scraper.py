@@ -149,25 +149,39 @@ def save_card_and_price(card: dict, detail: dict):
 async def scrape_pricechart(browser, year_url: str):
     failed = []
     sets = await scrape_sets(browser, year_url)
+    print(f"[pricechart] total sets discovered: {len(sets)}")
     inserted = 0
     for y, s in enumerate(sets):
+        set_name = s.get("name", "")
+        print(f"[pricechart] set index={y} name={set_name}")
         if y != 142:
+            print(f"[pricechart] skip set index={y} (only set 142 enabled)")
             continue
         set_link = s.get("link", "")
         if not set_link:
+            print(f"[pricechart] skip set index={y} name={set_name}: empty link")
             continue
         try:
             cards = await scrape_cards(browser, set_link)
+            print(f"[pricechart] set index={y} name={set_name} cards discovered: {len(cards)}")
         except Exception as e:
+            print(f"[pricechart] set scrape failed index={y} name={set_name}: {e}")
             failed.append({"set": s.get("name", ""), "error": str(e)})
             continue
         for z, card in enumerate(cards):
+            card_name = card.get("name", "")
+            print(f"[pricechart] card index={z} name={card_name}")
             try:
                 detail = await scrape_card_detail(browser, card.get("link", ""))
                 created = await asyncio.to_thread(save_card_and_price, card, detail)
                 if created:
                     inserted += 1
+                    print(f"[pricechart] inserted card index={z} name={card_name} total_inserted={inserted}")
+                else:
+                    print(f"[pricechart] already exists card index={z} name={card_name}")
             except Exception as e:
+                print(f"[pricechart] card failed index={z} name={card_name}: {e}")
                 failed.append({"set": s.get("name", ""), "card": card.get("name", ""), "error": str(e)})
                 continue
+    print(f"[pricechart] done inserted={inserted} failed={len(failed)}")
     return {"ok": True, "sets": len(sets), "insertedCards": inserted, "failedCount": len(failed), "failed": failed}
