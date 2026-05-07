@@ -162,8 +162,6 @@ async def scrape_pricechart(browser, year_url: str):
             failed.append({"set": s.get("name", ""), "error": str(e)})
             continue
         for z, card in enumerate(cards):
-            if z < 302:
-                continue
             try:
                 detail = await scrape_card_detail(browser, card.get("link", ""))
                 created = await asyncio.to_thread(save_card_and_price, card, detail)
