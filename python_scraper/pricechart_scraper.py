@@ -153,7 +153,7 @@ async def scrape_pricechart(browser, year_url: str):
     for y, s in enumerate(sets):
         set_name = s.get("name", "")
         print(f"[pricechart] currently processing set index={y} name={set_name}")
-        if y != 146:
+        if y < 147:
             continue
         set_link = s.get("link", "")
         if not set_link:
@@ -164,8 +164,6 @@ async def scrape_pricechart(browser, year_url: str):
             failed.append({"set": s.get("name", ""), "error": str(e)})
             continue
         for z, card in enumerate(cards):
-            if z < 183:
-                continue
             try:
                 detail = await scrape_card_detail(browser, card.get("link", ""))
                 created = await asyncio.to_thread(save_card_and_price, card, detail)
