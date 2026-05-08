@@ -153,7 +153,7 @@ async def scrape_pricechart(browser, year_url: str):
     for y, s in enumerate(sets):
         set_name = s.get("name", "")
         print(f"[pricechart] currently processing set index={y} name={set_name}")
-        if y < 147:
+        if y < 152:
             continue
         set_link = s.get("link", "")
         if not set_link:
