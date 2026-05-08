@@ -58,9 +58,19 @@ async def tag(req: TAGRequest):
 
 @app.post("/scrape/pricecharting")
 async def pricecharting(req: PriceChartRequest):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        try:
-            return await scrape_pricechart(browser, req.url)
-        finally:
-            await browser.close()
+    last_err = None
+    for _ in range(3):
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            )
+            try:
+                return await scrape_pricechart(browser, req.url)
+            except Exception as e:
+                last_err = e
+                if "Target page, context or browser has been closed" not in str(e):
+                    raise
+            finally:
+                await browser.close()
+    raise last_err
