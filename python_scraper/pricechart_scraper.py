@@ -163,7 +163,7 @@ async def scrape_pricechart(browser, year_url: str):
         except Exception as e:
             failed.append({"set": s.get("name", ""), "error": str(e)})
             continue
-         for z, card in enumerate(cards):
+        for z, card in enumerate(cards):
             if z < 183:
                 continue
             try:
